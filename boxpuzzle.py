@@ -1,7 +1,23 @@
-import math,random, sys, copy
+import math,random, sys, copy, heapq, itertools
+
+class NodeQueue(object):
+    def __init__(self):
+        self.heap = []
+        
+    def __getitem__(self, index):
+        result = self.heap[index]
+        return result
+
+    def add(self, node):
+        heapq.heappush(self.heap, node)
+
+    def pop(self):
+        node = heapq.heappop(self.heap)
+        return node
+
 
 class Node:
-    def __init__(self, tiles, goal):
+    def __init__(self, tiles, goal, parent):
         self.tiles = tiles
         self.g = 0
         self.h = 0
@@ -12,7 +28,8 @@ class Node:
         #generate a hash based on the numbers
         for i in self.tiles:
             self.hash += str(self.tiles[i])
-            
+        self.parent = parent
+        
     def updateF(self):  
         self.f = self.updateG() + self.updateH()
         return self.f
@@ -39,6 +56,7 @@ class Node:
 
     # i is the new place you want to move the zero. No error checking
     def move(self, i):
+        print "moving"
         new = copy.deepcopy(self)
         oldZero = new.findTile(0)
         n = new.getTile(i)
@@ -103,95 +121,68 @@ class Node:
     def __str__(self):
         return "%s" % self.log("", False)       
 
-class puzzle:
-    def __init__(self, startTiles, goalTiles):
-        self.startNode = Node(startTiles, goalTiles)
-        self.goalNode = Node(goalTiles, goalTiles)
-        
-        self.fronts=[self.startNode]
-        self.closedNodes=[]
-        self.lowestNode = self.startNode
+class Problem():
+    def __init__(self, initialState, goalState):
+        self.initialState = initialState
+        self.goalState = goalState
 
-        
-    def Test(self):
-            #print self.heruistic(self.TestNode)
-            
-            self.expandTree(self.startNode)
-            print self.getNextNode()
-            
-    def Solve(self):
-        while not self.fronts.empty() :
-            if self.lowestNode.isGoal() :
-                print "VICTORY"
-                return
-            self.fronts.remove(self.lowestNode)
-            self.closedNodes.append(self.lowestNode)
-            
-            dirs = {"left", "right", "up", "down"}
-            
-            for direction in dirs:
-                move = self.lowestNode.checkMove(direction)
-                if ( move > -1) :
-                    newNode = self.lowestNode.move(move)
-                    if (newNode in self.closedNodes) :
-                        continue
-                    if (newNode not in self.fronts or self.lowestNode.g > newNode.g) :
-                        newNode.parent = self.lowestNode
-                        if newNode not in self.fronts:
-                            self.fronts.append(newNode)
-                    
-                    
-                    self.fronts.append(newNode)
-            print "Fail"
-            return        
-        
-        self.expandTree(self.startNode)
-        nxNode=self.getNextNode()
-        n = 0 
-        #self.log(nxNode)
-#        print self.PreviousNode
-        #raw_input("Press Enter to continue...")
-        while (nxNode.tiles != nxNode.goal):
-            n= n+1
-            self.expandTree(nxNode)
-            nxNode=self.getNextNode()
-            if (n > 30 ):
-                print "Wrong"
-                sys.exit()
-            #self.log(nxNode)
-            #print self.PreviousNode
-            #raw_input("Press Enter to continue...")
-        print nxNode
-        print n
+    def goalTest(self, state):
+        isGoal = (self.goalState == state) 
+
+class PriQueue():
+    def __init__(self):
+        self.pq = []                         # list of entries arranged in a heap
+        self.entry_finder = {}               # mapping of tasks to entries
+        self.REMOVED = '<removed-task>'      # placeholder for a removed task
+        self.counter = itertools.count()     # unique sequence count
     
-    def expandTree(self,node):        
-        dirs = {"left", "right", "up", "down"}
-        
-        for direction in dirs:
-            move = node.checkMove(direction)
-            if ( move > -1) :
-                newNode = node.move(move)
-                if (not (node.hash in self.previousNodes)) :
-                    self.fronts.append(newNode)
-             
-    def getNextNode(self):
-        while True:
-            for front in self.fronts:
-                print "checking front %s" % front
-                if(front.f < self.currentNode.f):
-                    print "found lower: %s < %s" % (front.f, self.currentNode.f)
-                    self.currentNode = front
-            
-#            if front.hash in self.previousNode and front.hash in self.fronts:
-#                print "remove tNode from fronts"
-#                self.fronts.remove(tNode)
-#                self.PreviousNode.append(tNode)
-#                
-            else:
-                self.closedNodes.append(tNode)
-                print "Next node is %s" % nxNode
-                return nxNode  
-   
-puzzle = puzzle([1, 6, 4, 8, 7, 0, 3, 2, 5], [0, 1, 2, 3, 4, 5, 6, 7, 8])
-#puzzel.Solve()
-puzzle.Solve()
+    def add(self, task, priority=0):
+        'Add a new task or update the priority of an existing task'
+        if task in self.entry_finder:
+            self.remove(task)
+        count = next(self.counter)
+        entry = [priority, count, task]
+        self.entry_finder[task] = entry
+        heapq.heappush(self.pq, entry)
+    
+    def remove(self, task):
+        'Mark an existing task as REMOVED.  Raise KeyError if not found.'
+        entry = self.entry_finder.pop(task)
+        entry[-1] = self.REMOVED
+    
+    def pop(self):
+        'Remove and return the lowest priority task. Raise KeyError if empty.'
+        while self.pq:
+            priority, count, task = heapq.heappop(self.pq)
+            if task is not self.REMOVED:
+                del self.entry_finder[task]
+                return task
+        raise KeyError('pop from an empty priority queue')
+
+    def empty(self):
+        return not self.entry_finder
+    
+def expand(problem, node):
+      
+    dirs = ["left", "right", "up", "down"]
+    successors = []        
+    for direction in dirs:
+        move = node.checkMove(direction)
+        if ( move > -1) :
+            successors.add(node.move(move))
+    return successors
+ 
+def aStarTreeSearch(problem):
+    initialNode = Node(problem.initialState)
+    fringe = PriQueue().add(initialNode), initialNode.h)
+    while True:
+        if fringe.empty() return False
+        node = fringe.pop())
+        if problem.goalTest(node.tiles):
+            return node.actions #path
+        for successor in expand(problem, node):
+            fringe.add(sucessor, f(successor))
+#END
+
+8puzzle = Problem(initialState=[1, 6, 4, 8, 7, 0, 3, 2, 5], goalState=[0, 1, 2, 3, 4, 5, 6, 7, 8])
+print aStarTreeSearch(8puzzle)
