@@ -127,14 +127,14 @@ class PriQueue():
             priority, count, task = heapq.heappop(self.pq)
             if task is not self.REMOVED:
                 del self.entry_finder[task]
-                print "pop! f: %s  g: %s h: %s count: %s" % (priority, task.g, manH(task.tiles, eightPuzzle.goalState), count)
+                #print "pop! f: %s  g: %s h: %s count: %s" % (priority, task.g, manH(task.tiles, eightPuzzle.goalState), count)
                 return task
         raise KeyError('pop from an empty priority queue')
 
     def empty(self):
         return not self.entry_finder
     
-def expand(problem, node):
+def expand(node):
       
     dirs = ["left", "right", "up", "down"]
     successors = []        
@@ -148,18 +148,73 @@ def aStarTreeSearch(problem, h):
     initialNode = Node(problem.initialState)
     fringe = PriQueue()
     fringe.add(initialNode, h(initialNode.tiles, problem.goalState))
-    #while True:
-    for i in range(1,30):
+    while True:
+    #for i in range(1,30):
         if not fringe: return False
         node = fringe.pop()
         if problem.goalTest(node.tiles):
             print "Solution Found!"
+            print node.g
             return node.actions #path
-        for successor in expand(problem, node):
+        for successor in expand(node):
             fringe.add(successor, successor.g + h(successor.tiles, problem.goalState))
 #END
 
-#eightPuzzle = Problem(initialState=[1, 6, 4, 8, 7, 0, 3, 2, 5], goalState=[0, 1, 2, 3, 4, 5, 6, 7, 8])
+def aStarGraphSearch(problem, h):
+    initialNode = Node(problem.initialState)
+    fringe = PriQueue()
+    fringe.add(initialNode, h(initialNode.tiles, problem.goalState))
+    allNodes = set()
+    allNodes.add(initialNode.hash)
+    while True:
+    #for i in range(1,30):
+        if not fringe: return False
+        node = fringe.pop()
+        if problem.goalTest(node.tiles):
+            print "Solution Found!"
+            print node.g
+            return node.actions #path
+        for successor in expand(node):
+            if not successor in allNodes:
+                fringe.add(successor, successor.g + h(successor.tiles, problem.goalState))
+                allNodes.add(successor.hash)
+#END
 
-eightPuzzle = Problem(initialState=[1,2, 0, 3, 4, 5, 6, 7, 8], goalState=[0, 1, 2, 3, 4, 5, 6, 7, 8])
-print aStarTreeSearch(eightPuzzle, manH)
+def find27StepsSearch():
+    initialNode = Node([0,1,2,3,4,5,6,7,8,9])
+    fringe = PriQueue()
+    fringe.add(initialNode, initialNode.g)
+    allNodes = set()
+    allNodes.add(initialNode.hash)
+    count = 0
+    while True:
+    #for i in range(1,30):
+        if not fringe: return False
+        node = fringe.pop()
+        if node.g >= 27:
+            print "All paths found."
+            return count  #path
+        for successor in expand(node):
+            if not successor.hash in allNodes:
+                fringe.add(successor, successor.g)
+                allNodes.add(successor.hash)
+                #print "add %s" % successor.g
+                if successor.g == 27:
+                    count += 1
+                    #print count
+            #else:
+                #print "dupe"
+
+
+
+treePuzzle = Problem(initialState=[1, 6, 4, 8, 7, 0, 3, 2, 5], goalState=[0, 1, 2, 3, 4, 5, 6, 7, 8])
+graphPuzzle = Problem(initialState=[8, 1, 7, 4, 5, 6, 2, 0, 3], goalState=[0, 1, 2, 3, 4, 5, 6, 7, 8])
+
+print "A* star tree: (Ans: 21)"
+print aStarTreeSearch(treePuzzle, manH)
+
+print "A* star graph: (Ans: 25)"
+print aStarGraphSearch(graphPuzzle, manH)
+
+print "Count all solutions of 27 steps (Ans: 6274)"
+print find27StepsSearch()
