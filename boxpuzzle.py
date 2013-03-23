@@ -1,86 +1,39 @@
 import math,random, sys, copy, heapq, itertools
 
-class NodeQueue(object):
-    def __init__(self):
-        self.heap = []
-        
-    def __getitem__(self, index):
-        result = self.heap[index]
-        return result
-
-    def add(self, node):
-        heapq.heappush(self.heap, node)
-
-    def pop(self):
-        node = heapq.heappop(self.heap)
-        return node
-
-
 class Node:
-    def __init__(self, tiles, goal, parent):
+    def __init__(self, tiles, parent=None):
         self.tiles = tiles
         self.g = 0
-        self.h = 0
-        self.f = 0
-        self.goal = goal
-        self.updateF()
         self.hash = ""
-        #generate a hash based on the numbers
-        for i in self.tiles:
-            self.hash += str(self.tiles[i])
+        self.actions = []
         self.parent = parent
+        if self.parent:
+            self.actions = list(parent.actions)
+            self.g = parent.g + 1
+        self.actions.append(tiles)
+        self.resetHash()
         
-    def updateF(self):  
-        self.f = self.updateG() + self.updateH()
-        return self.f
-
-    def updateG(self, n=0):
-        self.g = self.g + n
-        return self.g
-    
-    # Computes the heuristic value for a node. 
-    def updateH(self):
-        manDist=0
-        totalDist=0
-        # skip counting the range for the empty slot per the class video.
-        for i in range(1,9):
-            manDist  = self.manhattanDist(self.tiles.index(i), self.goal.index(i))
-            totalDist += manDist
-            #print "Tile %s manDist is %s  TOTAL: %s" % (i, manDist, totalDist)
-        #print node
-        self.h = totalDist
-        return self.h
+    def resetHash(self):
+        #generate a hash based on the numbers
+        self.hash = ""
+        for i in self.tiles:
+            self.hash += str(i)
 
     def getTile(self, i=0):
         return self.tiles[i]
 
     # i is the new place you want to move the zero. No error checking
     def move(self, i):
-        print "moving"
-        new = copy.deepcopy(self)
-        oldZero = new.findTile(0)
-        n = new.getTile(i)
-        new.tiles[oldZero] = n
-        new.tiles[i] = 0
-        new.updateG(1)
-        new.updateF();
-        return new
+        oldZero = self.findTile(0)
+        n = self.getTile(i)
+        newTiles = list(self.tiles)
+        newTiles[oldZero] = n
+        newTiles[i] = 0
+        newNode = Node(newTiles, self)
+        return newNode
         
     def findTile(self, n=0):
         return self.tiles.index(n)
-
-    def isGoal(self):
-        return (self.tiles == self.goal)
-    
-    #Calculates the Manhattan distance of 2 points in a 3x3 board.
-    def manhattanDist(self, p1, p2):
-        row1 = p1/3
-        row2 = p2/3
-        col1 = p1%3
-        col2 = p2%3
-        dist = abs(row1 - row2) + abs(col1 - col2)
-        #print 'r1: %s, r2: %s, c1: %s, c2: %s, d: %s' % (row1, row2, col1, col2, dist)
-        return dist
     
     def log(self, msg = "", printout = True, stop = False):
         output = msg + "\n"
@@ -93,8 +46,9 @@ class Node:
         if (stop == True) :
             raw_input("Press Enter to continue...")
         return output
+ 
     def checkMove(self, direction):
-        zeroLoc = self.getTile(0)
+        zeroLoc = self.findTile(0)
         down = zeroLoc+3
         up = zeroLoc-3
         left = zeroLoc-1
@@ -102,7 +56,7 @@ class Node:
 
         if (zeroLoc <= 2):
             leftBound = 0
-        if (zeroLoc >= 6):
+        elif (zeroLoc >= 6):
             leftBound = 6
         else:
             leftBound = 3
@@ -121,6 +75,22 @@ class Node:
     def __str__(self):
         return "%s" % self.log("", False)       
 
+
+# h using manhatten distance
+def manH(state, goalState):
+    manDist=0
+    # skip counting the range for the empty slot per the class video.
+    for i in range(1,9):
+        p1 = state.index(i)
+        p2 = goalState.index(i)
+        row1 = p1/3
+        row2 = p2/3
+        col1 = p1%3
+        col2 = p2%3
+        manDist += abs(row1 - row2) + abs(col1 - col2)
+        #print "Tile %s manDist is %s  TOTAL: %s" % (i, manDist, totalDist)
+    return manDist
+
 class Problem():
     def __init__(self, initialState, goalState):
         self.initialState = initialState
@@ -128,6 +98,7 @@ class Problem():
 
     def goalTest(self, state):
         isGoal = (self.goalState == state) 
+        return isGoal
 
 class PriQueue():
     def __init__(self):
@@ -156,6 +127,7 @@ class PriQueue():
             priority, count, task = heapq.heappop(self.pq)
             if task is not self.REMOVED:
                 del self.entry_finder[task]
+                print "pop! f: %s  g: %s h: %s count: %s" % (priority, task.g, manH(task.tiles, eightPuzzle.goalState), count)
                 return task
         raise KeyError('pop from an empty priority queue')
 
@@ -169,20 +141,25 @@ def expand(problem, node):
     for direction in dirs:
         move = node.checkMove(direction)
         if ( move > -1) :
-            successors.add(node.move(move))
+            successors.append(node.move(move))
     return successors
  
-def aStarTreeSearch(problem):
+def aStarTreeSearch(problem, h):
     initialNode = Node(problem.initialState)
-    fringe = PriQueue().add(initialNode), initialNode.h)
-    while True:
-        if fringe.empty() return False
-        node = fringe.pop())
+    fringe = PriQueue()
+    fringe.add(initialNode, h(initialNode.tiles, problem.goalState))
+    #while True:
+    for i in range(1,30):
+        if not fringe: return False
+        node = fringe.pop()
         if problem.goalTest(node.tiles):
+            print "Solution Found!"
             return node.actions #path
         for successor in expand(problem, node):
-            fringe.add(sucessor, f(successor))
+            fringe.add(successor, successor.g + h(successor.tiles, problem.goalState))
 #END
 
-8puzzle = Problem(initialState=[1, 6, 4, 8, 7, 0, 3, 2, 5], goalState=[0, 1, 2, 3, 4, 5, 6, 7, 8])
-print aStarTreeSearch(8puzzle)
+#eightPuzzle = Problem(initialState=[1, 6, 4, 8, 7, 0, 3, 2, 5], goalState=[0, 1, 2, 3, 4, 5, 6, 7, 8])
+
+eightPuzzle = Problem(initialState=[1,2, 0, 3, 4, 5, 6, 7, 8], goalState=[0, 1, 2, 3, 4, 5, 6, 7, 8])
+print aStarTreeSearch(eightPuzzle, manH)
